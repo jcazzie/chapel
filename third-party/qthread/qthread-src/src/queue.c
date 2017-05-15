@@ -4,7 +4,6 @@
 
 #include "qthread/qthread.h"
 
-#include "qt_alloc.h"
 #include "qt_mpool.h"
 #include "qt_asserts.h"
 #include "qt_debug.h"
@@ -44,7 +43,7 @@ void INTERNAL qthread_queue_subsystem_init(void)
 qthread_queue_t API_FUNC qthread_queue_create(uint8_t   flags,
                                               aligned_t length)
 {
-    qthread_queue_t q = qt_calloc(1, sizeof(struct qthread_queue_s));
+    qthread_queue_t q = calloc(1, sizeof(struct qthread_queue_s));
 
     assert(q);
     if (flags & QTHREAD_QUEUE_MULTI_JOIN) {
@@ -200,7 +199,7 @@ int API_FUNC qthread_queue_release_all(qthread_queue_t q)
             for (size_t c = 0; c < q->q.capped.membercount; c++) {
                 if (members_copy[c] != NULL) { qthread_queue_internal_launch(members_copy[c], shep); }
             }
-            qt_free(members_copy);
+            free(members_copy);
             break;
         }
         default:

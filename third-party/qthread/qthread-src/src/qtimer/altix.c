@@ -125,7 +125,7 @@ qtimer_t qtimer_create(void)
         }
     }
 
-    return qt_calloc(1, sizeof(struct qtimer_s));
+    return calloc(1, sizeof(struct qtimer_s));
 }
 
 void qtimer_destroy(qtimer_t q)

@@ -19,9 +19,9 @@
 #include "qthread_innards.h" /* for qlib */
 #include "qt_qthread_mgmt.h"
 
-int qt_usleep(useconds_t useconds)
+int usleep(useconds_t useconds)
 {
-     if (qt_blockable()) {
+    if ((qlib != NULL) && (qthread_internal_self() != NULL)) {
         qtimer_t t       = qtimer_create();
         double   seconds = useconds * 1e-6;
         qtimer_start(t);
@@ -29,24 +29,22 @@ int qt_usleep(useconds_t useconds)
             qthread_yield();
             qtimer_stop(t);
         } while (qtimer_secs(t) < seconds);
-        qtimer_destroy(t);
         return 0;
     } else {
-        return -1;
+#if HAVE_SYSCALL
+# if HAVE_DECL_SYS_USLEEP
+        return syscall(SYS_usleep, useconds);
+
+# elif HAVE_DECL_SYS_NANOSLEEP
+        return syscall(SYS_nanosleep, useconds * 1e3);
+
+# else
+        return 0;
+# endif
+#else
+        return 0;
+#endif  /* if HAVE_SYSCALL */
     }
 }
-
-
-#if HAVE_SYSCALL && HAVE_DECL_SYS_USLEEP
-int usleep(useconds_t useconds)
-{
-  if (qt_blockable()) {
-    return qt_usleep(useconds);
-  } else {
-    return syscall(SYS_usleep, useconds);
-  }
-}
-
-#endif /* if HAVE_SYSCALL && HAVE_DECL_SYS_USLEEP */
 
 /* vim:set expandtab: */

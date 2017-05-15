@@ -7,6 +7,7 @@ Configuring and Building
 ------------------------
 
     ./configure --enable-multinode \
+                --with-multinode-runtime={mpi,pmi,shmemrt}
                 --with-portals4[=DIR]
                 [...]
     make
@@ -32,9 +33,9 @@ Launching with SLURM and `pmi`:
     Hello from locale 004!
     Hello from locale 002!
 
-Launching with YOD (provided with Portals4):
+Launching with YOD (provided with Portals4) and `shmemrt`:
 
-    env VERBOSE=1 yod.hydra -c 4 hello_world
+    env VERBOSE=1 yod -c 4 hello_world
     Hello from locale 003!
     Hello from locale 001!
     Hello from locale 004!

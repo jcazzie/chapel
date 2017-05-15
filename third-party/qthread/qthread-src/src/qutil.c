@@ -13,7 +13,6 @@
 #include <qthread/cacheline.h>
 
 /* Internal Headers */
-#include "qt_alloc.h"
 #include "qt_asserts.h"           /* for assert() toggling */
 #include "qt_visibility.h"
 #include "qt_debug.h"
@@ -79,7 +78,7 @@ extern int qthread_library_initialized;
         while (start + MT_LOOP_CHUNK < length) {                                          \
             /* spawn off an MT_LOOP_CHUNK-sized segment of the first part of the array */ \
             struct _structtype_ *left_args =                                              \
-                qt_calloc(1, sizeof(struct _structtype_));                                   \
+                calloc(1, sizeof(struct _structtype_));                                   \
                                                                                           \
             left_args->array            = array;                                          \
             left_args->start            = start;                                          \
@@ -940,7 +939,7 @@ static inline qutil_qsort_iprets_t qutil_aligned_qsort_inner_partitioner(aligned
     struct qutil_aligned_qsort_args *args;
     size_t                           i;
 
-    rets = qt_calloc(numthreads, sizeof(syncvar_t));
+    rets = calloc(numthreads, sizeof(syncvar_t));
     args = MALLOC(sizeof(struct qutil_aligned_qsort_args) * numthreads);
     /* spawn threads to do the partitioning */
     for (i = 0; i < numthreads; i++) {

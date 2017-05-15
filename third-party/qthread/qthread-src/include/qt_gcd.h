@@ -2,8 +2,6 @@
 # include "config.h"
 #endif
 
-#include "qthread-int.h"
-
 static QINLINE size_t qt_gcd(size_t a, size_t b)
 {
 #ifdef QTHREAD_SHIFT_GCD

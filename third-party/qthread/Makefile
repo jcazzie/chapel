@@ -31,6 +31,11 @@ ifeq ($(CHPL_MAKE_HWLOC),system)
 CHPL_QTHREAD_CFG_OPTIONS += --with-topology=hwloc
 endif
 
+CHPL_QTHREAD_ENABLE_PERFORMANCE=yes
+ifneq (, $(CHPL_QTHREAD_ENABLE_PERFORMANCE))
+	CFLAGS += '-DQTHREAD_PERFORMANCE'
+  CHPL_QTHREAD_CFG_OPTIONS += --disable-lazy-threadids --enable-picky
+endif
 
 # Have qthreads use Chapel's allocator, unless directed not to
 ifeq (, $(call isTrue, $(CHPL_QTHREAD_NO_CHPL_ALLOC)))

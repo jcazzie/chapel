@@ -1,4 +1,4 @@
-# -*- Makefile -*-VE
+# -*- Makefile -*-
 #
 # Copyright (c)      2012  Sandia Corporation
 #
@@ -29,10 +29,6 @@ TESTS = \
 
 if COMPILE_EUREKAS
 TESTS += eureka
-endif
-
-if HAVE_GUARD_PAGES
-TESTS += guard_pages
 endif
 
 EXTRA_PROGRAMS = wavefront

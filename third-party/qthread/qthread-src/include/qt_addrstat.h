@@ -17,7 +17,6 @@ static QINLINE qthread_addrstat_t *qthread_addrstat_new(void)
         ret->EFQ   = NULL;
         ret->FEQ   = NULL;
         ret->FFQ   = NULL;
-        ret->FFWQ  = NULL;
         QTHREAD_EMPTY_TIMER_INIT(ret);
     }
     return ret;

@@ -66,6 +66,7 @@ int main(int   argc,
     for (int i = 0; i < NUM_VERTICES; i++) {
         in_degrees[i] = 0;
     }
+
     /* Initialize SPR in SPMD mode */
     qthread_f actions[2] = {incr_in_degree, NULL};
     spr_init(SPR_SPMD, actions);
@@ -92,13 +93,12 @@ int main(int   argc,
         edges[i].lid = random_locale();
         edges[i].vid = random_vertex();
     }
-
     for (int i = 0; i < num_edges; i++) {
         printf("[%03d] edges[%d]: (%lu,%lu)\n", here, i, 
                edges[i].lid, edges[i].vid);
     }
 
-    qt_global_barrier();
+    /* TODO: barrier */
 
     /* Fill in-degrees property map */
     rets = malloc(num_edges * sizeof(aligned_t));

@@ -3,7 +3,6 @@
 #endif
 
 #include "qthread/qthread.h" /* for aligned_t */
-#include "qt_alloc.h"
 #include "qt_atomics.h" /* for SPINLOCK_BODY() */
 #include "qthread/qtimer.h"
 
@@ -75,7 +74,7 @@ double qtimer_secs(qtimer_t q)
 
 qtimer_t qtimer_create()
 {
-    return qt_calloc(1, sizeof(struct qtimer_s));
+    return calloc(1, sizeof(struct qtimer_s));
 }
 
 void qtimer_destroy(qtimer_t q)

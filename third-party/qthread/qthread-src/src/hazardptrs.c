@@ -9,7 +9,6 @@
 #include <stdlib.h>            /* for qsort() and abort() */
 
 /* Internal Headers */
-#include "qt_alloc.h"
 #include "qt_hazardptrs.h"
 #include "qt_shepherd_innards.h"
 #include "qthread_innards.h"
@@ -48,8 +47,7 @@ void INTERNAL initialize_hazardptrs(void)
         for (qthread_worker_id_t j = 0; j < qlib->nworkerspershep; ++j) {
             memset(qlib->shepherds[i].workers[j].hazard_ptrs, 0, sizeof(uintptr_t) * HAZARD_PTRS_PER_SHEP);
             memset(&qlib->shepherds[i].workers[j].hazard_free_list, 0, sizeof(hazard_freelist_t));
-            qlib->shepherds[i].workers[j].hazard_free_list.freelist = qt_calloc(freelist_max + 1,
-                                                                                sizeof(hazard_freelist_entry_t));
+            qlib->shepherds[i].workers[j].hazard_free_list.freelist = calloc(freelist_max + 1, sizeof(hazard_freelist_entry_t));
             assert(qlib->shepherds[i].workers[j].hazard_free_list.freelist);
             qlib->shepherds[i].workers[j].hazard_free_list.freelist[freelist_max].ptr = free_these_freelists;
             free_these_freelists                                                      = qlib->shepherds[i].workers[j].hazard_free_list.freelist;
@@ -69,8 +67,7 @@ void INTERNAL hazardous_ptr(unsigned int which,
         {
             qthread_worker_t *wkr = qthread_internal_getworker();
             if (wkr == NULL) {
-                hzptrs = qt_calloc(sizeof(uintptr_t),
-                                   HAZARD_PTRS_PER_SHEP + 1);
+                hzptrs = calloc(sizeof(uintptr_t), HAZARD_PTRS_PER_SHEP + 1);
                 assert(hzptrs);
                 do {
                     hzptrs[HAZARD_PTRS_PER_SHEP] = (uintptr_t)QTHREAD_CASLOCK_READ(hzptr_list);
@@ -122,8 +119,7 @@ static void hazardous_scan(hazard_freelist_t *hfl)
     hazard_freelist_t tmpfreelist;
 
     assert(plist);
-    tmpfreelist.freelist = qt_calloc(freelist_max,
-                                     sizeof(hazard_freelist_entry_t));
+    tmpfreelist.freelist = calloc(freelist_max, sizeof(hazard_freelist_entry_t));
     assert(tmpfreelist.freelist);
     do {
         /* Stage 1: Collect hazardpointers */

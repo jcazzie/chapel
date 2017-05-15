@@ -13,7 +13,7 @@ AC_PREREQ(2.59)
 ## ---------------------------------- ##
 AC_INIT([qthread],
         [m4_esyscmd([config/version-gen])],
-        [wg-qthread@sandia.gov])
+        [dstark@sandia.gov])
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_MACRO_DIR([config])
 AC_CONFIG_SRCDIR([src/qthread.c])
@@ -166,6 +166,7 @@ AC_ARG_ENABLE([debug],
                                Other available areas are:
                                affinity,
                                barrier,
+                               chapel,
                                core,
                                febs,
                                futurelib,
@@ -183,7 +184,7 @@ AC_ARG_ENABLE([debug],
                                threadqueues,
                                xomp])],
               [AS_IF([test "x$enable_debug" = "xyes"],
-                     [enable_debug="affinity,threadqueues,thread,shepherd,core,team,mpool,syscalls,febs,syncvars,io,loops,barrier,qarray,rcrtool,futurelib,xomp,multinode"])
+                     [enable_debug="affinity,threadqueues,thread,shepherd,core,team,mpool,syscalls,febs,syncvars,io,loops,barrier,qarray,rcrtool,futurelib,xomp,multinode,chapel"])
                for area in $(echo "$enable_debug" | sed 's/,/ /g') ; do
                  case "$area" in
                      affinity) enable_debug_affinity=yes ;;
@@ -204,6 +205,7 @@ AC_ARG_ENABLE([debug],
                      futurelib) enable_debug_futurelib=yes ;;
                      xomp) enable_debug_xomp=yes ;;
                      multinode) enable_debug_multinode=yes ;;
+                     chapel) enable_debug_chapel=yes ;;
                      *) AC_MSG_ERROR([Unrecognized debug category ($area).]) ;;
                  esac
                done],
@@ -213,8 +215,8 @@ AC_ARG_ENABLE([profiling],
               [AS_HELP_STRING([--enable-profiling=[[areas]]],
                               [turn on the specified comma-separated types of
                                profiling. Available types are: shepherd, lock,
-                               steal, cas_steal, threadc, sincs, teams, and spr
-                               . Shepherd profiling counts the wall-clock 
+                               steal, cas_steal, threadc, sincs, teams, spr, and
+                               chapel. Shepherd profiling counts the wall-clock 
                                time that each shepherd spends idle. FEB
                                profiling counts the time spent waiting for FEB 
                                states. Steal profiling counts the amount of 
@@ -225,7 +227,8 @@ AC_ARG_ENABLE([profiling],
                                threads available to run concurrently. Sincs 
                                profiling reports sinc counter usage data. Teams
                                profiling reports team counter usage data. SPR
-                               profiling reports communication information. ])],
+                               profiling reports communication information. 
+                               Chapel profiling reports Chapel interface usage.])],
               [for area in $(echo "$enable_profiling" | sed 's/,/ /g') ; do
                  case "$area" in
                    shepherd|shepherds)
@@ -252,8 +255,11 @@ AC_ARG_ENABLE([profiling],
                    spr)
                      enable_spr_profiling=yes
                      ;;
+                   chapel)
+                     enable_chapel_profiling=yes
+                     ;;
                    *)
-                     AC_MSG_ERROR([Unsupported profiling option ($area), supported options are: shepherd, feb, steal, cas_steal, threadc, sincs, teams, spr])
+                     AC_MSG_ERROR([Unsupported profiling option ($area), supported options are: shepherd, feb, steal, cas_steal, threadc, sincs, teams, spr, chapel])
                      ;;
                  esac
                done],
@@ -295,12 +301,12 @@ AC_ARG_ENABLE([64bit-alignment],
 AC_ARG_WITH([topology],
             [AS_HELP_STRING([--with-topology=[[topologylib]]],
                             [specify which topology interface to use. Supported
-                             interfaces include hwloc, hwloc_v2, binders, lgrp, libnuma,
+                             interfaces include hwloc, hwloc_v2, lgrp, libnuma,
                              libnumaV2, mach, plpa, sys, and, tilera.])],
             [AS_IF([test "x$with_topology" = xyes],
                    [with_topology=none_specified])
              case "$with_topology" in
-                 hwloc|binders|hwloc_v2|lgrp|libnuma|libnumaV2|mach|no|plpa|sys|tilera) ;;
+                 hwloc|hwloc_v2|lgrp|libnuma|libnumaV2|mach|no|plpa|sys|tilera) ;;
                  none_specified) ;;
                  *)
                  AC_MSG_ERROR([Unsupported topology library ($with_topology)])
@@ -331,6 +337,26 @@ AC_ARG_ENABLE([condwait-queue],
                                communication (important if spinning shepherds
                                interfere with each other). Default enabled on
                                sparc/solaris, but default disabled elsewhere.])])
+
+AC_ARG_ENABLE([interfaces],
+              [AS_HELP_STRING([--enable-interfaces=[[list]]],
+                              [Comma separated list of compiler interfaces to
+                               support. Available interfaces include chapel and
+                               rose.])],
+              [for iface in $(echo "$enable_interfaces" | sed 's/,/ /g') ; do
+                 case "$iface" in
+                   chapel)
+                     compile_chapel_interface=yes
+                     ;;
+                   rose)
+                     enable_rose_extensions=yes
+                     ;;
+                   *)
+                     AC_MSG_ERROR([Unsupported interface ($iface) selected.])
+                     ;;
+                 esac
+               done
+               EXTRA_DISTCHECK_OPTIONS="$EXTRA_DISTCHECK_OPTIONS --enable-interfaces=$enable_interfaces"])
 
 AC_ARG_ENABLE([rose-extensions],
               [AS_HELP_STRING([--enable-rose-extensions],
@@ -373,11 +399,6 @@ AC_ARG_WITH([sinc],
                             [Specify the sinc implementation. Options are
                              'donecount' (default), 'donecount_cas', 'snzi', and 'original'.])])
 
-AC_ARG_WITH([alloc],
-          [AS_HELP_STRING([--with-alloc=[[type]]],
-                             [Specify the memory allocator. The only
-                             option is 'base' for now.])])
-
 AC_ARG_WITH([dict],
             [AS_HELP_STRING([--with-dict=[[type]]],
                             [Specify the dictionary implementation. Options are
@@ -385,6 +406,11 @@ AC_ARG_WITH([dict],
 AC_ARG_WITH([barrier],
             [AS_HELP_STRING([--with-barrier=[[type]]],
                             [Specify the barrier implementation. Options are 'feb' (default), 'sinc', 'array', and 'log'.])])
+
+AC_ARG_WITH([multinode-runtime],
+                   [AS_HELP_STRING([--with-multinode-runtime@<:@=OPTION@:>@],
+                                   [Use OPTION as runtime support, current options
+                                    are shmemrt, mpi, and pmi @<:@default=mpi@:>@])])
 
 AC_ARG_ENABLE([hpctoolkit],
               [AS_HELP_STRING([--enable-hpctoolkit-support],
@@ -408,6 +434,14 @@ AC_ARG_WITH([cacheline-width],
             [],
             [with_cacheline_width=64])
 
+AC_ARG_VAR([CHPL_HOME],
+           [Provide the path to the Chapel build directory. Only used if the
+            Chapel compiler interface is enabled. Also sets CHPL_OPTS])
+
+AS_IF([test "x$CHPL_HOME" != "x"],
+      [CHPL_OPTS=`$CHPL_HOME/util/config/compileline --includes-and-defines`
+       EXTRA_DISTCHECK_OPTIONS="$EXTRA_DISTCHECK_OPTIONS CHPL_HOME=\"$CHPL_HOME\""])
+
 AC_ARG_ENABLE([multinode],
           [AS_HELP_STRING([--enable-multinode],
                               [Enable experimental support for multi-node qthreads applications])])
@@ -417,6 +451,30 @@ AC_ARG_VAR([MPICXX], [Path to the MPI C++ compiler-wrapper.])
 
 AC_CACHE_SAVE
 #}}}
+
+AS_IF([test "x$enable_multinode" = "xyes"], 
+      [AS_IF([test "x$with_multinode_runtime" = "x"],
+             [with_multinode_runtime=mpi])
+       dnl ((((  make parens from case statement match something
+       case "$with_multinode_runtime" in
+           mpi)
+           AS_IF([test "x$MPICC" = "x"],
+                 [AC_PATH_PROGS([MPICC],[mpicc mpic])])
+           AS_IF([test "x$MPICC" != "x"],
+                 [CC="$MPICC"],
+                 [AC_MSG_ERROR([Cannot find an MPI C compiler wrapper.])])
+           AS_IF([test "x$MPICXX" = "x"],
+                 [AC_PATH_PROGS([MPICXX],[mpic++ mpicxx mpiCC])])
+           AS_IF([test "x$MPICXX" != "x"],
+                 [CXX="$MPICXX"],
+                 [AC_MSG_ERROR([Cannot find an MPI C++ compiler wrapper.])])
+           ;;
+           pmi)
+	       ;;
+           *) AC_MSG_ERROR([bad value ${with_multinode_runtime} for --with-multinode-runtime]) ;;
+       esac],
+      [enable_multinode="no"
+       with_multinode_runtime=""])
 
 ## ------------------- ##
 ## Checks for programs ##
@@ -592,9 +650,9 @@ AS_IF([test "x$enable_pooled_memory" = "xno"],
 AS_IF([test "x$enable_memory_scribbling" = "xyes"],
       [AC_DEFINE([QTHREAD_MEMORY_SCRIBBLING], [1], [turns on memory scribbling])])
 
-AS_IF([test "x$enable_spawn_cache" = "xyes"],
+AS_IF([test "x$enable_spawn_cache" != "xno"],
       [AC_DEFINE([QTHREAD_USE_SPAWNCACHE],[1],[Define to use worker-specific spawn cache])
-       enable_spawn_cache=no])
+       enable_spawn_cache=yes])
 
 AS_IF([test "x$enable_eurekas" = "xyes"],
       [AC_DEFINE([QTHREAD_USE_EUREKAS],[1],[Define to use eurekas])
@@ -707,11 +765,6 @@ AS_IF([test "x$enable_guard_pages" = "xyes"],
       [AC_DEFINE([QTHREAD_GUARD_PAGES], [1], [Use guard pages to detect stack overruns])],
       [enable_guard_pages="no"])
 
-AS_IF([test "x$enable_precache_guard_pages" = "xyes"],
-      [AC_DEFINE([QTHREAD_PRECACHE_GUARD_PAGES], [1], [Precache guard pages in pooled stacks])],
-      [enable_precache_guard_pages="no"])
-
-
 AC_CACHE_SAVE
 
 ## --------------------------- ##
@@ -788,7 +841,7 @@ AS_IF([test "x$with_scheduler" != "x"],
          default)
            [with_scheduler="sherwood"]
            ;;
-         sherwood|loxley|nemesis|lifo|mutexfifo|mtsfifo|distrib)
+         sherwood|loxley|nemesis|lifo|mutexfifo|mtsfifo)
            # all valid options that require no additional configuration
            ;;
          mdlifo)
@@ -844,6 +897,10 @@ AS_IF([test "x$enable_spr_profiling" = xyes],
       [AC_DEFINE([SPR_PROFILE], [1], [Support dynamic profile of SPR infomation])],
       [enable_spr_profiling="no"])
 
+AS_IF([test "x$enable_chapel_profiling" = xyes],
+      [AC_DEFINE([CHAPEL_PROFILE], [1], [Support dynamic profile of Chapel infomation])],
+      [enable_chapel_profiling="no"])
+
 AS_IF([test "x$enable_cas_steal_profiling" = xyes],
       [AC_DEFINE([CAS_STEAL_PROFILE], [1], [Support dynamic profile of CAS steal infomation])],
       [enable_cas_steal_profiling="no"])
@@ -854,14 +911,6 @@ AS_IF([test "x$with_sinc" = "x"],
 case "$with_sinc" in
  donecount|donecount_cas|snzi|original) ;;
  *) AC_MSG_ERROR([Unknown sinc option]) ;;
-esac
-
-AS_IF([test "x$with_alloc" = "x"],
-      [with_alloc="base"],
-      [])
-case "$with_alloc" in
- base|chapel) ;;
- *) AC_MSG_ERROR([Unknown alloc option]) ;;
 esac
 
 AS_IF([test "x$with_barrier" = "x"],
@@ -935,6 +984,8 @@ AS_IF([test "x$enable_debug" = x -o "x$enable_debug" = xno],
                       [QTHREAD_DEBUG_XOMP], [prints out xomp debugging information at runtime])
        QT_COND_DEFINE([$enable_debug_multinode],
                       [QTHREAD_DEBUG_MULTINODE], [prints out multinode debugging information at runtime])
+       QT_COND_DEFINE([$enable_debug_chapel],
+                      [QTHREAD_DEBUG_CHAPEL], [prints out chapel interface debugging information at runtime])
        ])
 
 AS_IF([test "x$enable_rcrtool" = "xyes"],
@@ -1017,8 +1068,8 @@ AS_IF([test "x$qthread_topo" != xno],
       [AS_IF([test "x$qthread_topo" = "xnone_specified"],
              [qthread_topo=no])
        # First, check for hwloc, since it gives me the most portable/flexible/reliable/detailed information.
-       AS_IF([test "x$qthread_topo" = xno -o "x$qthread_topo" = xbinders -o "x$qthread_topo" = xhwloc -o "x$qthread_topo" = xhwloc_v2],
-             [QTHREAD_CHECK_HWLOC([AS_IF([test "x$qthread_topo" != xhwloc -a "x$qthread_topo" != xhwloc_v2 -a "x$qthread_topo" != xbinders],
+       AS_IF([test "x$qthread_topo" = xno -o "x$qthread_topo" = xhwloc -o "x$qthread_topo" = xhwloc_v2],
+             [QTHREAD_CHECK_HWLOC([AS_IF([test "x$qthread_topo" != xhwloc -a "x$qthread_topo" != xhwloc_v2],
                                          [qthread_topo=hwloc])],
                                   [AS_IF([test "x$qthread_topo" != xno],
                                          [AC_MSG_ERROR([Specified topology library ($qthread_topo) does not work.])])])])
@@ -1055,10 +1106,29 @@ AS_IF([test "x$qthread_topo" != xno],
 AS_IF([test "x$enable_multinode" = "xyes"], 
       [AC_DEFINE([QTHREAD_MULTINODE], [1], [Defined if multinode support desired])
        QTHREAD_CHECK_PORTALS4([], [AC_MSG_ERROR([Could not find Portals 4 library])])
-       CPPFLAGS="$CPPFLAGS $portals4_CPPFLAGS $portals4_runtime_CPPFLAGS"
-       LDFLAGS="$LDFLAGS $portals4_LDFLAGS $portals4_runtime_LDFLAGS"
-       LIBS="$LIBS $portals4_LIBS $portals4_runtime_LIBS"
-      ])
+       CPPFLAGS="$CPPFLAGS $portals4_CPPFLAGS"
+       LDFLAGS="$LDFLAGS $portals4_LDFLAGS"
+       LIBS="$LIBS $portals4_LIBS"
+       dnl ((((  make parens from case statement match something
+       case "$with_multinode_runtime" in
+           shmemrt)
+             AS_IF([test "x$check_portals4_dir" != "x" -a -d "$check_portals4_dir/bin"],
+                   [yodsearchpath="$check_portals4_dir/bin:$PATH"],
+                   [yodsearchpath="$PATH"])
+             AC_PATH_PROG([yod],[yod], [], [$yodsearchpath])
+             AS_IF([test "x$ac_cv_path_yod" = "x"],
+                   [AC_MSG_ERROR([Cannot find yod.])])
+           ;;
+           mpi)
+           ;;
+	   pmi)
+             ORTE_CHECK_PMI([pmi], [], [AC_MSG_ERROR([PMI runtime requested, PMI not found])])
+	     CPPFLAGS="$CPPFLAGS $pmi_CPPFLAGS"
+             LDFLAGS="$LDFLAGS $pmi_LDFLAGS"
+             LIBS="$LIBS $pmi_LIBS"
+	   ;;
+           *) AC_MSG_ERROR([bad value ${with_multinode_runtime} for --with-multinode-runtime]) ;;
+       esac])
 
 AS_IF([test "x$enable_lf_febs" == "xyes"],
       [AC_DEFINE([LOCK_FREE_FEBS], [1], [Define to use a lock-free hash table for FEB metadata.])],
@@ -1071,7 +1141,6 @@ AC_SUBST(EXTRA_DISTCHECK_OPTIONS)
 AC_SUBST(qthread_topo)
 AC_SUBST(with_scheduler)
 AC_SUBST(with_sinc)
-AC_SUBST(with_alloc)
 AC_SUBST(with_dict)
 AC_SUBST(with_barrier)
 AC_SUBST(OPENMP_CFLAGS)
@@ -1087,13 +1156,16 @@ AM_CONDITIONAL([QTHREAD_TIMER_TYPE_ALTIX], [test "x$qthread_timer_type" = "xalti
 AM_CONDITIONAL([QTHREAD_TIMER_TYPE_GETTIMEOFDAY], [test "x$qthread_timer_type" = "xgettimeofday"])
 AM_CONDITIONAL([COMPILE_ROSE_EXTENSIONS], [test "x$enable_rose_extensions" = "xyes"])
 AM_CONDITIONAL([COMPILE_RCRTOOL], [test "x$enable_rcrtool" = "xyes"])
+AM_CONDITIONAL([COMPILE_CHAPEL_INTERFACE], [test "x$compile_chapel_interface" = "xyes"])
 AM_CONDITIONAL([COMPILE_COMPAT_ATOMIC], [test "x$compile_compat_atomic" = "xyes"])
 AM_CONDITIONAL([COMPILE_SPAWNCACHE], [test "x$enable_spawn_cache" = "xyes"])
 AM_CONDITIONAL([COMPILE_EUREKAS], [test "x$enable_eurekas" = "xyes"])
-AM_CONDITIONAL([HAVE_GUARD_PAGES], [test "x$enable_guard_pages" = "xyes"])
 AM_CONDITIONAL([HAVE_PROG_TIMELIMIT], [test "x$timelimit_path" != "x"])
 AM_CONDITIONAL([COMPILE_MULTINODE], [test "$enable_multinode" = "yes"])
+AM_CONDITIONAL([WANT_PORTALS_SHMEM_RUNTIME], [test "$with_multinode_runtime" = "shmemrt"])
 AM_CONDITIONAL([WANT_SINGLE_WORKER_SCHEDULER], [test "x$with_scheduler" = "xnemesis" -o "x$with_scheduler" = "xlifo" -o "x$with_scheduler" = "xmutexfifo" -o "x$with_scheduler" = "xmtsfifo" -o "x$with_scheduler" = "xmdlifo"])
+AM_CONDITIONAL([WANT_MPI_RUNTIME], [test "$with_multinode_runtime" = "mpi"])
+AM_CONDITIONAL([WANT_PMI_RUNTIME], [test "$with_multinode_runtime" = "pmi"])
 AM_CONDITIONAL([COMPILE_OMP_BENCHMARKS], [test "x$have_openmp" = "xyes"])
 AM_CONDITIONAL([COMPILE_TBB_BENCHMARKS], [test "x$have_tbb" = "xyes"])
 AM_CONDITIONAL([COMPILE_CILK_BENCHMARKS], [test "x$have_cilk" = "xyes"])
@@ -1104,8 +1176,7 @@ AC_CONFIG_HEADERS([include/config.h include/qthread/common.h])
 AC_CONFIG_FILES([Makefile
                  src/Makefile
                  man/Makefile
-                
- man/man3/Makefile
+                 man/man3/Makefile
                  include/Makefile
                  include/qthread/Makefile
                  test/Makefile
@@ -1161,7 +1232,6 @@ echo    "    Check alignment: $enable_aligncheck"
 echo    "          Profiling: $enable_profiling"
 echo    "   Debugging Output: $enable_debug"
 echo    "        Guard Pages: $enable_guard_pages"
-echo    "          Precaching: $enable_precache_guard_pages"
 echo    ""
 AS_IF([test "x$enable_pooled_memory" = "xyes"],
       [pool_string="memory"],
@@ -1190,7 +1260,6 @@ AS_IF([test "x$using_mdlifo" = "xyes"],
 echo    "Speed:"
 echo    "          Scheduler: $with_scheduler"
 echo    "         Sinc Style: $with_sinc"
-echo    "        Alloc Style: $with_alloc"
 echo    "      Barrier Style: $with_barrier"
 echo    "   Dictionary Style: $with_dict"
 echo    "    Lazy Thread IDs: $enable_lazy_threadids"
