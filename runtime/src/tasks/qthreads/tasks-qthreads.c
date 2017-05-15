@@ -381,7 +381,11 @@ static void SIGINT_handler(int sig)
         fprintf(stderr, "Taskreport is currently unsupported by the qthreads tasking layer.\n");
 #endif
     }
-
+    qtperf_stop();
+    // Print the results in a human readable format
+    qtperf_print_results();
+    // Deallocate everything. No more calls to qtperf_* after this!
+    qtperf_free_data();
     chpl_exit_any(1);
 }
 
@@ -389,6 +393,9 @@ static void SIGINT_handler(int sig)
 
 static void *initializer(void *junk)
 {
+    qtperf_set_instrument_workers(1);
+    qtperf_set_instrument_qthreads(1);
+    qtperf_start();
     qthread_initialize();
     (void) pthread_mutex_lock(&done_init_final_mux);  // implicit memory fence
     chpl_qthread_done_initializing = 1;
