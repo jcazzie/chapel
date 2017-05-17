@@ -759,6 +759,7 @@ void chpl_task_exit(void)
     } else {
         qthread_syncvar_fill(&exit_ret);
     }
+    qtperf_print_results();
 }
 
 static inline void wrap_callbacks(chpl_task_cb_event_kind_t event_kind,
