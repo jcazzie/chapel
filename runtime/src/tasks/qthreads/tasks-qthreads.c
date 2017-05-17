@@ -759,6 +759,7 @@ void chpl_task_exit(void)
     } else {
         qthread_syncvar_fill(&exit_ret);
     }
+    printf("finishing\n");
     qtperf_print_results();
 }
 
